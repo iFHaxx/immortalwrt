@@ -313,8 +313,8 @@ menu "Target Images"
 	config TARGET_ROOTFS_PARTSIZE
 		int "Root filesystem partition size (in MiB)"
 		depends on USES_ROOTFS_PART || TARGET_ROOTFS_EXT4FS
-		default 300 if BUILDBOT
-		default 160
+		default 512 if BUILDBOT
+		default 1024
 		help
 		  Select the root filesystem partition size.
 

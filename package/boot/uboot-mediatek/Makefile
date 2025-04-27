@@ -822,6 +822,18 @@ define U-Boot/mt7986_zyxel_ex5601-t0
   DEPENDS:=+trusted-firmware-a-mt7986-spim-nand-4k-ddr4
 endef
 
+define U-Boot/mt7986_superbox_s20-plus
+  NAME:=Superbox S20-Plus
+  BUILD_SUBTARGET:=filogic
+  BUILD_DEVICES:=superbox_s20-plus
+  UBOOT_CONFIG:=mt7986a_superbox_s20-plus
+  UBOOT_IMAGE:=u-boot.fip
+  BL2_BOOTDEV:=emmc
+  BL2_SOC:=mt7986
+  BL2_DDRTYPE:=ddr4
+  DEPENDS:=+trusted-firmware-a-mt7986-emmc-ddr4
+endef
+
 define U-Boot/mt7988_arcadyan_mozart
   NAME:=Arcadyan Mozart
   BUILD_SUBTARGET:=filogic
@@ -1048,6 +1060,7 @@ UBOOT_TARGETS := \
 	mt7986_tplink_tl-xtr8488 \
 	mt7986_xiaomi_redmi-router-ax6000 \
 	mt7986_zyxel_ex5601-t0 \
+	mt7986_superbox_s20-plus \
 	mt7986_rfb \
 	mt7988_arcadyan_mozart \
 	mt7988_asus_zenwifi-bt8 \

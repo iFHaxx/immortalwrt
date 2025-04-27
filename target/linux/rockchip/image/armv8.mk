@@ -418,6 +418,16 @@ define Device/radxa_zero-3w
 endef
 TARGET_DEVICES += radxa_zero-3w
 
+define Device/rumu3f_fine-3399
+  DEVICE_VENDOR := RUMU3F
+  DEVICE_MODEL := Fine 3399
+  SOC := rk3399
+  UBOOT_DEVICE_NAME := fine3399-rk3399
+  BOOT_FLOW := pine64-bin
+  DEVICE_PACKAGES := kmod-r8169 wpad-openssl brcmfmac-firmware-43430b0-sdio brcmfmac-nvram-43430b0-sdio
+endef
+TARGET_DEVICES += rumu3f_fine-3399
+
 define Device/sinovoip_bpi-r2-pro
   DEVICE_VENDOR := Bananapi
   DEVICE_MODEL := BPi-R2 Pro
