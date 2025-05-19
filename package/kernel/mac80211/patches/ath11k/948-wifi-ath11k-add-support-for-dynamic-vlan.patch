@@ -23,19 +23,19 @@ Signed-off-by: David Rapan <david@rapan.cz>
 --- a/drivers/net/wireless/ath/ath11k/core.h
 +++ b/drivers/net/wireless/ath/ath11k/core.h
 @@ -121,6 +121,7 @@ struct ath11k_skb_cb {
-        u32 cipher;
-        struct ath11k *ar;
-        struct ieee80211_vif *vif;
-+       u32 pkt_offset;
+ 	u32 cipher;
+ 	struct ath11k *ar;
+ 	struct ieee80211_vif *vif;
++   u32 pkt_offset;
  } __packed;
-
+ 
  struct ath11k_skb_rxcb {
 --- a/drivers/net/wireless/ath/ath11k/dp_tx.c
 +++ b/drivers/net/wireless/ath/ath11k/dp_tx.c
 @@ -79,6 +79,42 @@ enum hal_encrypt_type ath11k_dp_tx_get_e
-        }
+ 	}
  }
-
+ 
 +#define HTT_META_DATA_ALIGNMENT        0x8
 +
 +static int ath11k_dp_metadata_align_skb(struct sk_buff *skb, u8 align_len)
@@ -73,34 +73,34 @@ Signed-off-by: David Rapan <david@rapan.cz>
 +}
 +
  int ath11k_dp_tx(struct ath11k *ar, struct ath11k_vif *arvif,
-                 struct ath11k_sta *arsta, struct sk_buff *skb)
+ 		 struct ath11k_sta *arsta, struct sk_buff *skb)
  {
 @@ -97,6 +133,9 @@ int ath11k_dp_tx(struct ath11k *ar, stru
-        u32 ring_selector = 0;
-        u8 ring_map = 0;
-        bool tcl_ring_retry;
-+       bool is_diff_encap = false;
-+       u8 align_pad;
-+       u8 htt_meta_size = 0;
-
-        if (unlikely(test_bit(ATH11K_FLAG_CRASH_FLUSH, &ar->ab->dev_flags)))
-                return -ESHUTDOWN;
+ 	u32 ring_selector = 0;
+ 	u8 ring_map = 0;
+ 	bool tcl_ring_retry;
++	bool is_diff_encap = false;
++	u8 align_pad;
++	u8 htt_meta_size = 0;
+ 
+ 	if (unlikely(test_bit(ATH11K_FLAG_CRASH_FLUSH, &ar->ab->dev_flags)))
+ 		return -ESHUTDOWN;
 @@ -189,7 +228,10 @@ tcl_ring_sel:
-
-        switch (ti.encap_type) {
-        case HAL_TCL_ENCAP_TYPE_NATIVE_WIFI:
--               ath11k_dp_tx_encap_nwifi(skb);
-+               if (arvif->vif->offload_flags & IEEE80211_OFFLOAD_ENCAP_ENABLED)
-+                       is_diff_encap = true;
-+               else
-+                       ath11k_dp_tx_encap_nwifi(skb);
-                break;
-        case HAL_TCL_ENCAP_TYPE_RAW:
-                if (!test_bit(ATH11K_FLAG_RAW_MODE, &ab->dev_flags)) {
+ 
+ 	switch (ti.encap_type) {
+ 	case HAL_TCL_ENCAP_TYPE_NATIVE_WIFI:
+-		ath11k_dp_tx_encap_nwifi(skb);
++		if (arvif->vif->offload_flags & IEEE80211_OFFLOAD_ENCAP_ENABLED)
++			is_diff_encap = true;
++		else
++			ath11k_dp_tx_encap_nwifi(skb);
+ 		break;
+ 	case HAL_TCL_ENCAP_TYPE_RAW:
+ 		if (!test_bit(ATH11K_FLAG_RAW_MODE, &ab->dev_flags)) {
 @@ -208,6 +250,33 @@ tcl_ring_sel:
-                goto fail_remove_idr;
-        }
-
+ 		goto fail_remove_idr;
+ 	}
+ 
 +       /* Add metadata for software encryption of vlan group traffic */
 +       if ((!test_bit(ATH11K_FLAG_HW_CRYPTO_DISABLED, &ar->ab->dev_flags) &&
 +           !(info->control.flags & IEEE80211_TX_CTL_HW_80211_ENCAP) &&
@@ -128,45 +128,45 @@ Signed-off-by: David Rapan <david@rapan.cz>
 +               ti.encrypt_type = HAL_ENCRYPT_TYPE_OPEN;
 +       }
 +
-        ti.paddr = dma_map_single(ab->dev, skb->data, skb->len, DMA_TO_DEVICE);
-        if (unlikely(dma_mapping_error(ab->dev, ti.paddr))) {
-                atomic_inc(&ab->soc_stats.tx_err.misc_fail);
+ 	ti.paddr = dma_map_single(ab->dev, skb->data, skb->len, DMA_TO_DEVICE);
+ 	if (unlikely(dma_mapping_error(ab->dev, ti.paddr))) {
+ 		atomic_inc(&ab->soc_stats.tx_err.misc_fail);
 @@ -216,7 +285,8 @@ tcl_ring_sel:
-                goto fail_remove_idr;
-        }
-
--       ti.data_len = skb->len;
-+       ti.data_len = skb->len - ti.pkt_offset;
-+       skb_cb->pkt_offset = ti.pkt_offset;
-        skb_cb->paddr = ti.paddr;
-        skb_cb->vif = arvif->vif;
-        skb_cb->ar = ar;
+ 		goto fail_remove_idr;
+ 	}
+ 
+-	ti.data_len = skb->len;
++	ti.data_len = skb->len - ti.pkt_offset;
++	skb_cb->pkt_offset = ti.pkt_offset;
+ 	skb_cb->paddr = ti.paddr;
+ 	skb_cb->vif = arvif->vif;
+ 	skb_cb->ar = ar;
 @@ -272,6 +342,8 @@ fail_unmap_dma:
-        dma_unmap_single(ab->dev, ti.paddr, ti.data_len, DMA_TO_DEVICE);
-
+ 	dma_unmap_single(ab->dev, ti.paddr, ti.data_len, DMA_TO_DEVICE);
+ 
  fail_remove_idr:
-+       if (ti.pkt_offset)
-+               skb_pull(skb, ti.pkt_offset);
-        spin_lock_bh(&tx_ring->tx_idr_lock);
-        idr_remove(&tx_ring->txbuf_idr,
-                   FIELD_GET(DP_TX_DESC_ID_MSDU_ID, ti.desc_id));
++	if (ti.pkt_offset)
++		skb_pull(skb, ti.pkt_offset);
+ 	spin_lock_bh(&tx_ring->tx_idr_lock);
+ 	idr_remove(&tx_ring->txbuf_idr,
+ 		   FIELD_GET(DP_TX_DESC_ID_MSDU_ID, ti.desc_id));
 @@ -348,6 +420,10 @@ ath11k_dp_tx_htt_tx_complete_buf(struct
-                return;
-        }
-
-+       if (skb_cb->pkt_offset)
-+               /* Removing the alignment and htt meta data */
-+               skb_pull(msdu, skb_cb->pkt_offset);
+ 		return;
+ 	}
+ 
++	if (skb_cb->pkt_offset)
++		/* Removing the alignment and htt meta data */
++		skb_pull(msdu, skb_cb->pkt_offset);
 +
-        memset(&info->status, 0, sizeof(info->status));
-
-        if (ts->acked) {
+ 	memset(&info->status, 0, sizeof(info->status));
+ 
+ 	if (ts->acked) {
 --- a/drivers/net/wireless/ath/ath11k/dp_tx.h
 +++ b/drivers/net/wireless/ath/ath11k/dp_tx.h
 @@ -17,6 +17,203 @@ struct ath11k_dp_htt_wbm_tx_status {
-        u16 peer_id;
+ 	u16 peer_id;
  };
-
+ 
 +/* htt_tx_msdu_desc_ext
 + *
 + * valid_pwr
@@ -370,12 +370,12 @@ Signed-off-by: David Rapan <david@rapan.cz>
 --- a/drivers/net/wireless/ath/ath11k/mac.c
 +++ b/drivers/net/wireless/ath/ath11k/mac.c
 @@ -10260,6 +10260,9 @@ static int __ath11k_mac_register(struct
-                goto err_free_if_combs;
-        }
-
+ 		goto err_free_if_combs;
+ 	}
+ 
 +       ar->hw->wiphy->interface_modes |= BIT(NL80211_IFTYPE_AP_VLAN);
 +       ar->hw->wiphy->software_iftypes |= BIT(NL80211_IFTYPE_AP_VLAN);
 +
-        if (!ab->hw_params.supports_monitor)
-                /* There's a race between calling ieee80211_register_hw()
-                 * and here where the monitor mode is enabled for a little
+ 	if (!ab->hw_params.supports_monitor)
+ 		/* There's a race between calling ieee80211_register_hw()
+ 		 * and here where the monitor mode is enabled for a little
