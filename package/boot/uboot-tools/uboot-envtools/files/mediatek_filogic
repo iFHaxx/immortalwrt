@@ -82,8 +82,7 @@ bananapi,bpi-r4-poe|\
 cmcc,rax3000m|\
 cmcc,rax3000me|\
 jdcloud,re-cp-03|\
-konka,komi-a31|\
-superbox,s20-plus)
+konka,komi-a31)
 	. /lib/upgrade/fit.sh
 	export_fitblk_bootdev
 	case "$CI_METHOD" in

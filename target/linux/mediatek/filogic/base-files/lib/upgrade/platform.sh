@@ -103,8 +103,7 @@ platform_do_upgrade() {
 	xiaomi,mi-router-ax3000t-ubootmod|\
 	xiaomi,redmi-router-ax6000-ubootmod|\
 	xiaomi,mi-router-wr30u-ubootmod|\
-	zyxel,ex5601-t0-ubootmod|\
-	superbox,s20-plus)
+	zyxel,ex5601-t0-ubootmod)
 		fit_do_upgrade "$1"
 		;;
 	acer,predator-w6|\
@@ -285,8 +284,7 @@ platform_copy_config() {
 	smartrg,sdg-8733|\
 	smartrg,sdg-8733a|\
 	smartrg,sdg-8734|\
-	ubnt,unifi-6-plus|\
-	superbox,s20-plus)
+	ubnt,unifi-6-plus)
 		emmc_copy_config
 		;;
 	bananapi,bpi-r3|\
