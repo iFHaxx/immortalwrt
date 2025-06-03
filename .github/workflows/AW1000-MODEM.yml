@@ -106,7 +106,7 @@ jobs:
 
       - name: Prepare config file
         run: |
-          cp ./AW1000/AW1000-MODEM.nss .config
+          cp ./AW1000/AW1000-FULL.nss .config
           make defconfig
 
       - name: Download package sources

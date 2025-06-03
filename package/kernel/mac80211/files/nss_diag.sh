@@ -84,11 +84,26 @@ done
 echo -e "${reset}"
 echo -ne "${bold}${red}  NSS PKGS${reset}: ${white}"
 
-apk list -I | awk -v count=0 '
+if command -v opkg >/dev/null 2>&1; then
+	opkg list-installed | awk -v count=0 '
 	/kmod-qca|^nss/ {
 	if(count>0) tab="            "
 	print tab $1
 	count++
-}'
+        }'
+	
+elif command -v apk >/dev/null 2>&1; then
+	apk list -I | awk -v count=0 '
+	/kmod-qca|^nss/ {
+	if(count>0) tab="            "
+	print tab $1
+	count++
+	}'
+else
+	echo "Package manager not found"
+fi
+
+echo -ne "${reset}"
+
 
 echo -ne "${reset}"
